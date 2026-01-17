@@ -13,7 +13,12 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.sarah.example-app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Necesitamos tu ubicación para mostrar contenido cercano",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Usamos tu ubicación incluso cuando la app está en segundo plano"
+      }
     },
     "android": {
       "adaptiveIcon": {
