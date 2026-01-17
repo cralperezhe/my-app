@@ -1,146 +1,298 @@
-import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useEffect, useState } from "react";
+import { MaterialCommunityIcons } from '@expo/vector-icons'
+import { useEffect, useRef, useState } from 'react'
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  FlatList,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import { geoJsonToPolyline } from "./src/utils/normalize";
-import MapView, { MapMarker, Polyline } from "react-native-maps";
-import Modal from "./src/components/Modal";
-import Button from "./src/components/Button";
-import routes from "./src/utils/json/rutas.json";
-import * as Location from "expo-location";
-import Checkbox from "./src/components/Checkbox";
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    FlatList,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native'
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
+import { geoJsonToPolyline } from './src/utils/normalize'
+import MapView, { Circle, MapMarker, Polyline } from 'react-native-maps'
+import Modal from './src/components/Modal'
+import Button from './src/components/Button'
+import routes from './src/utils/json/rutas.json'
+import * as Location from 'expo-location'
+import Checkbox from './src/components/Checkbox'
+import colors from './src/utils/colors'
+import TextField from './src/components/TextField'
 
-const { height: windowHeight } = Dimensions.get("window");
+const { height: windowHeight } = Dimensions.get('window')
 
 export default function App() {
-  const [location, setLocation] = useState(null);
-  const [showModal, setShowModal] = useState(false);
+    const [location, setLocation] = useState(null)
+    const [showModal, setShowModal] = useState(false)
+    const [search, setSearch] = useState('')
+    const [heading, setHeading] = useState(0)
+    const [accuracy, setAccuracy] = useState(null)
 
-  const [activeRoutes, setActiveRoutes] = useState(geoJsonToPolyline(routes));
+    const [activeRoutes, setActiveRoutes] = useState(geoJsonToPolyline(routes))
 
-  useEffect(() => {
-    getActualLocation();
-  }, []);
+    const mapRef = useRef(null)
+    const locationSuscription = useRef(null)
 
-  const getActualLocation = async () => {
-    let { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("", "No hay permisos de ubicación");
+    useEffect(() => {
+        getActualLocation()
+        return () => {
+            if (locationSuscription.current) {
+                locationSuscription.current.remove()
+                locationSuscription.current = null
+            }
+        }
+    }, [])
 
-      return;
+    const normalizeText = (text = '') =>
+        text
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+
+    const filteredRoutes = activeRoutes.filter((route) => {
+        const name = normalizeText(route.name ?? `Ruta ${route.id}`)
+        const query = normalizeText(search)
+
+        if (!query) return true
+
+        const words = query.split(' ').filter(Boolean)
+
+        return words.every((word) => name.includes(word))
+    })
+
+    const getActualLocation = async () => {
+        let { status } = await Location.requestForegroundPermissionsAsync()
+        if (status !== 'granted') {
+            Alert.alert('', 'No hay permisos de ubicación')
+
+            return
+        }
+        if (locationSuscription.current) {
+            locationSuscription.current.remove()
+            locationSuscription.current = null
+        }
+        locationSuscription.current = await Location.watchPositionAsync(
+            {
+                accuracy: Location.Accuracy.High,
+                timeInterval: 2000,
+                distanceInterval: 5,
+            },
+            (location) => {
+                const region = {
+                    latitude: location.coords.latitude,
+                    longitude: location.coords.longitude,
+                    latitudeDelta: 0.0025,
+                    longitudeDelta: 0.0025,
+                }
+                console.log(region)
+
+                setLocation(region)
+                setHeading(location.coords.heading ?? 0)
+                setAccuracy(location.coords.accuracy ?? null)
+
+                mapRef.current?.animateToRegion(region, 500)
+            }
+        )
     }
-    let location = await Location.getCurrentPositionAsync({});
 
-    setLocation({
-      latitude: location.coords.latitude,
-      longitude: location.coords.longitude,
-      latitudeDelta: 0.0025,
-      longitudeDelta: 0.0025,
-    });
-  };
+    const toggleRoute = (routeId) => {
+        setActiveRoutes((prev) =>
+            prev.map((route) =>
+                route.id === routeId
+                    ? { ...route, active: !route.active }
+                    : route
+            )
+        )
+    }
 
-  const toggleRoute = (routeId) => {
-    setActiveRoutes((prev) =>
-      prev.map((route) =>
-        route.id === routeId ? { ...route, active: !route.active } : route,
-      ),
-    );
-  };
+    const markAllRoutes = () => {
+        setActiveRoutes((prev) =>
+            prev.map((route) => ({ ...route, active: true }))
+        )
+    }
 
-  const _renderItem = ({ item }) => {
-    return (
-      <View style={{ marginVertical: 5 }}>
-        <Checkbox
-          key={item.id}
-          text={item.name ?? `Ruta ${item.id}`}
-          value={item.active}
-          onValueChange={() => toggleRoute(item.id)}
-        />
-      </View>
-    );
-  };
+    const unmarkAllRoutes = () => {
+        setActiveRoutes((prev) =>
+            prev.map((route) => ({ ...route, active: false }))
+        )
+    }
 
-  if (activeRoutes.length == 0) {
-    return (
-      <SafeAreaProvider>
-        <SafeAreaView>
-          <ActivityIndicator color="black" size="large" />
-        </SafeAreaView>
-      </SafeAreaProvider>
-    );
-  }
-
-  return (
-    <SafeAreaProvider>
-      <View style={styles.container}>
-        <MapView style={styles.map} initialRegion={location}>
-          <MapMarker coordinate={location}></MapMarker>
-          {activeRoutes.map(
-            (ruta) =>
-              ruta.active && (
-                <Polyline
-                  key={ruta.id}
-                  coordinates={ruta.coordinates}
-                  strokeWidth={4}
-                  strokeColor={ruta.color}
+    const _renderItem = ({ item }) => {
+        return (
+            <View style={{ marginVertical: 5 }}>
+                <Checkbox
+                    key={item.id}
+                    text={item.name ?? `Ruta ${item.id}`}
+                    value={item.active}
+                    onValueChange={() => toggleRoute(item.id)}
                 />
-              ),
-          )}
-        </MapView>
-        <TouchableOpacity
-          style={styles.floating_button}
-          onPress={() => setShowModal(true)}
-        >
-          <MaterialCommunityIcons name="cog" size={60} color="white" />
-        </TouchableOpacity>
-        <Modal visible={showModal} closeModal={() => setShowModal(false)}>
-          <View style={styles.list_view}>
-            <FlatList
-              data={activeRoutes}
-              renderItem={_renderItem}
-              style={{ maxHeight: windowHeight * 0.78 }}
-            />
-          </View>
-          <View style={{ alignItems: "center" }}>
-            <Button text="Cerrar" onPress={() => setShowModal(false)} />
-          </View>
-        </Modal>
-      </View>
-    </SafeAreaProvider>
-  );
+            </View>
+        )
+    }
+
+    if (activeRoutes.length == 0) {
+        return (
+            <SafeAreaProvider>
+                <SafeAreaView>
+                    <ActivityIndicator color="black" size="large" />
+                </SafeAreaView>
+            </SafeAreaProvider>
+        )
+    }
+
+    return (
+        <SafeAreaProvider>
+            <View style={styles.container}>
+                <MapView
+                    style={styles.map}
+                    initialRegion={location}
+                    ref={mapRef}
+                >
+                    {accuracy && (
+                        <Circle
+                            center={location}
+                            radius={accuracy}
+                            strokeWidth={1}
+                            strokeColor="rgba(0,122,255,0.3)"
+                            fillColor="rgba(0,122,255,0.15)"
+                        />
+                    )}
+                    <MapMarker
+                        coordinate={location}
+                        anchor={{ x: 0.5, y: 0.5 }}
+                        rotation={heading}
+                        flat
+                    >
+                        <View style={styles.iosLocationOuter}>
+                            <View style={styles.iosLocationInner} />
+                        </View>
+                    </MapMarker>
+                    {activeRoutes.map(
+                        (ruta) =>
+                            ruta.active && (
+                                <Polyline
+                                    key={ruta.id}
+                                    coordinates={ruta.coordinates}
+                                    strokeWidth={4}
+                                    strokeColor={ruta.color}
+                                />
+                            )
+                    )}
+                </MapView>
+                <TouchableOpacity
+                    style={styles.floating_button}
+                    onPress={() => setShowModal(true)}
+                >
+                    <MaterialCommunityIcons
+                        name="filter-cog"
+                        size={60}
+                        color={colors.primary}
+                    />
+                </TouchableOpacity>
+                <Modal
+                    visible={showModal}
+                    closeModal={() => setShowModal(false)}
+                    style={{ backgroundColor: colors.primary_dark }}
+                >
+                    <View
+                        style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            marginHorizontal: 7,
+                            justifyContent: 'center',
+                        }}
+                    >
+                        <TextField
+                            style={{ flex: 1 }}
+                            value={search}
+                            onChangeText={setSearch}
+                            placeholder="Buscar ruta"
+                        />
+                        <TouchableOpacity
+                            style={{
+                                padding: 10,
+                                marginVertical: 10,
+                                borderRadius: 100,
+                                backgroundColor: colors.primary_light,
+                            }}
+                            onPress={() => setShowModal(false)}
+                        >
+                            <MaterialCommunityIcons
+                                name="close-thick"
+                                size={34}
+                                color={colors.primary_dark}
+                            />
+                        </TouchableOpacity>
+                    </View>
+                    <View style={styles.list_view}>
+                        <FlatList
+                            data={filteredRoutes}
+                            renderItem={_renderItem}
+                            style={{ maxHeight: windowHeight * 0.74 }}
+                        />
+                    </View>
+                    <View
+                        style={{
+                            justifyContent: 'center',
+                            flexDirection: 'row',
+                        }}
+                    >
+                        <Button
+                            text="Marcar todos"
+                            onPress={markAllRoutes}
+                            style={{ backgroundColor: colors.accent_dark }}
+                        />
+                        <Button
+                            text="Desmarcar todos"
+                            onPress={unmarkAllRoutes}
+                            style={{ backgroundColor: colors.accent_dark }}
+                        />
+                    </View>
+                </Modal>
+            </View>
+        </SafeAreaProvider>
+    )
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  map: {
-    width: "100%",
-    height: "100%",
-  },
-  floating_button: {
-    position: "absolute",
-    bottom: 15,
-    right: 15,
-    padding: 10,
-    margin: 10,
-    borderRadius: 100,
-    backgroundColor: "black",
-  },
-  list_view: {
-    marginHorizontal: 20,
-    marginTop: 10,
-  },
-});
+    container: {
+        flex: 1,
+        backgroundColor: 'white',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    map: {
+        width: '100%',
+        height: '100%',
+    },
+    floating_button: {
+        position: 'absolute',
+        bottom: 15,
+        right: 15,
+        padding: 10,
+        margin: 10,
+        borderRadius: 100,
+        backgroundColor: colors.primary_light,
+    },
+    list_view: {
+        marginHorizontal: 20,
+    },
+    iosLocationOuter: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(0,122,255,0.2)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    iosLocationInner: {
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: '#007AFF',
+        borderWidth: 2,
+        borderColor: 'white',
+    },
+})
