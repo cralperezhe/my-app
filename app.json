@@ -7,6 +7,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "plugins": ["react-native-bottom-tabs", "react-native-vector-icons"],
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -18,7 +19,8 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Necesitamos tu ubicación para mostrar contenido cercano",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Usamos tu ubicación incluso cuando la app está en segundo plano"
-      }
+      },
+      "appleTeamId": "962D5MN44Q"
     },
     "android": {
       "adaptiveIcon": {
@@ -29,6 +31,9 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-status-bar"
+    ]
   }
 }

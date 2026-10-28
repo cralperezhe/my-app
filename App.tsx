@@ -5,10 +5,12 @@ import {
     Alert,
     Dimensions,
     FlatList,
+    Platform,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
+    type ImageSourcePropType,
 } from 'react-native'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { geoJsonToPolyline } from './src/utils/normalize'
@@ -21,15 +23,60 @@ import Checkbox from './src/components/Checkbox'
 import colors from './src/utils/colors'
 import TextField from './src/components/TextField'
 import WelcomeScreen from './src/components/WelcomeScreen'
-import BottomNavigation, { TabKey, TabItem } from './src/components/BottomNavigation'
+import { getImageSourceSync } from 'react-native-vector-icons/MaterialCommunityIcons'
+import TabView from 'react-native-bottom-tabs'
 import type { Route, MapRegion } from './src/utils/types'
 
 const { height: windowHeight } = Dimensions.get('window')
 
-const TABS: TabItem[] = [
-    { key: 'mapa', label: 'Mapa', icon: 'map-outline' },
-    { key: 'rutas', label: 'Rutas', icon: 'google-maps' },
-]
+// iOS 26+ usa SF Symbols nativos; Android usa glifos de MaterialCommunityIcons
+const isIOS = Platform.OS === 'ios'
+
+type TabRoute = {
+    key: 'mapa' | 'rutas'
+    title: string
+    focusedIcon?: any
+    unfocusedIcon?: any
+}
+
+const TABS: TabRoute[] = isIOS
+    ? [
+          {
+              key: 'mapa',
+              title: 'Mapa',
+              focusedIcon: { sfSymbol: 'map' },
+              unfocusedIcon: { sfSymbol: 'map' },
+          },
+          {
+              key: 'rutas',
+              title: 'Rutas',
+              focusedIcon: { sfSymbol: 'bus' },
+              unfocusedIcon: { sfSymbol: 'bus' },
+          },
+      ]
+    : ((() => {
+          const icon = (name: string) => {
+              try {
+                  return getImageSourceSync(name, 24) as ImageSourcePropType
+              } catch {
+                  return undefined
+              }
+          }
+          return [
+              {
+                  key: 'mapa',
+                  title: 'Mapa',
+                  focusedIcon: icon('map-outline'),
+                  unfocusedIcon: icon('map-outline'),
+              },
+              {
+                  key: 'rutas',
+                  title: 'Rutas',
+                  focusedIcon: icon('google-maps'),
+                  unfocusedIcon: icon('google-maps'),
+              },
+          ] 
+      })())
 
 export default function App() {
     const [location, setLocation] = useState<MapRegion | null>(null)
@@ -38,7 +85,7 @@ export default function App() {
     const [heading, setHeading] = useState(0)
     const [accuracy, setAccuracy] = useState<number | null>(null)
     const [welcomeDone, setWelcomeDone] = useState(false)
-    const [activeTab, setActiveTab] = useState<TabKey>('mapa')
+    const [activeTab, setActiveTab] = useState<'mapa' | 'rutas'>('mapa')
 
     const [activeRoutes, setActiveRoutes] = useState<Route[]>(
         geoJsonToPolyline(routes)
@@ -163,126 +210,138 @@ export default function App() {
 
     return (
         <SafeAreaProvider>
-            <View style={styles.container}>
-                {activeTab === 'mapa' && (
-                    <>
-                        <MapView
-                            style={styles.map}
-                            initialRegion={location}
-                            ref={mapRef}
-                        >
-                            {accuracy && (
-                                <Circle
-                                    center={location}
-                                    radius={accuracy}
-                                    strokeWidth={1}
-                                    strokeColor="rgba(0,122,255,0.3)"
-                                    fillColor="rgba(0,122,255,0.15)"
-                                />
-                            )}
-                            <MapMarker
-                                coordinate={location}
-                                anchor={{ x: 0.5, y: 0.5 }}
-                                rotation={heading}
-                                flat
+            <TabView
+                sidebarAdaptable
+                navigationState={{
+                    index: TABS.findIndex((t) => t.key === activeTab),
+                    routes: TABS,
+                }}
+                renderScene={({ route }) =>
+                    route.key === 'mapa' ? (
+                        <>
+                            <MapView
+                                style={styles.map}
+                                initialRegion={location ?? undefined}
+                                ref={mapRef}
                             >
-                                <View style={styles.iosLocationOuter}>
-                                    <View style={styles.iosLocationInner} />
-                                </View>
-                            </MapMarker>
-                            {activeRoutes.map(
-                                (ruta) =>
-                                    ruta.active && (
-                                        <Polyline
-                                            key={ruta.id}
-                                            coordinates={ruta.coordinates}
-                                            strokeWidth={4}
-                                            strokeColor={ruta.color}
-                                        />
-                                    )
-                            )}
-                        </MapView>
-                        <TouchableOpacity
-                            style={styles.floating_button}
-                            onPress={() => setShowModal(true)}
-                        >
-                            <MaterialCommunityIcons
-                                name="filter-cog"
-                                size={60}
-                                color={colors.primary}
+                                {location && accuracy && (
+                                    <Circle
+                                        center={location}
+                                        radius={accuracy}
+                                        strokeWidth={1}
+                                        strokeColor="rgba(0,122,255,0.3)"
+                                        fillColor="rgba(0,122,255,0.15)"
+                                    />
+                                )}
+                                {location && (
+                                    <MapMarker
+                                        coordinate={location}
+                                        anchor={{ x: 0.5, y: 0.5 }}
+                                        rotation={heading}
+                                        flat
+                                    >
+                                        <View style={styles.iosLocationOuter}>
+                                            <View
+                                                style={
+                                                    styles.iosLocationInner
+                                                }
+                                            />
+                                        </View>
+                                    </MapMarker>
+                                )}
+                                {activeRoutes.map(
+                                    (ruta) =>
+                                        ruta.active && (
+                                            <Polyline
+                                                key={ruta.id}
+                                                coordinates={ruta.coordinates}
+                                                strokeWidth={4}
+                                                strokeColor={ruta.color}
+                                            />
+                                        )
+                                )}
+                            </MapView>
+                            <TouchableOpacity
+                                style={styles.floating_button}
+                                onPress={() => setShowModal(true)}
+                            >
+                                <MaterialCommunityIcons
+                                    name="filter-cog"
+                                    size={60}
+                                    color={colors.primary}
+                                />
+                            </TouchableOpacity>
+                        </>
+                    ) : (
+                        <View style={styles.routes_screen}>
+                            <Text style={styles.routes_title}>Rutas</Text>
+                            <FlatList
+                                data={filteredRoutes}
+                                renderItem={_renderItem}
+                                style={{ maxHeight: windowHeight * 0.8 }}
+                                ListEmptyComponent={
+                                    <Text style={styles.routes_empty}>
+                                        No hay rutas que coincidan
+                                    </Text>
+                                }
                             />
-                        </TouchableOpacity>
-                    </>
-                )}
-                {activeTab === 'rutas' && (
-                    <View style={styles.routes_screen}>
-                        <Text style={styles.routes_title}>Rutas</Text>
-                        <FlatList
-                            data={filteredRoutes}
-                            renderItem={_renderItem}
-                            style={{ maxHeight: windowHeight * 0.8 }}
-                            ListEmptyComponent={
-                                <Text style={styles.routes_empty}>
-                                    No hay rutas que coincidan
-                                </Text>
-                            }
-                        />
-                    </View>
-                )}
-                <BottomNavigation
-                    tabs={TABS}
-                    activeTab={activeTab}
-                    onChangeTab={setActiveTab}
-                />
-                <Modal
-                    visible={showModal}
-                    closeModal={() => setShowModal(false)}
-                    style={{ backgroundColor: colors.primary_dark }}
-                >
-                    <View style={styles.header}>
-                        <TextField
-                            style={{ flex: 1 }}
-                            value={search}
-                            onChangeText={setSearch}
-                            placeholder="Buscar ruta"
-                        />
-                        <TouchableOpacity
-                            style={styles.close_button}
-                            onPress={() => setShowModal(false)}
-                        >
-                            <MaterialCommunityIcons
-                                name="close-thick"
-                                size={34}
-                                color={colors.primary_dark}
-                            />
-                        </TouchableOpacity>
-                    </View>
-                    <View style={styles.list_view}>
-                        <FlatList
-                            data={filteredRoutes}
-                            renderItem={_renderItem}
-                            style={{ maxHeight: windowHeight * 0.74 }}
-                        />
-                    </View>
-                    <View
-                        style={{
-                            justifyContent: 'center',
-                            flexDirection: 'row',
-                        }}
+                        </View>
+                    )
+                }
+                onIndexChange={(index) =>
+                    setActiveTab(
+                        index === 0 ? 'mapa' : 'rutas'
+                    )
+                }
+            />
+            <Modal
+                visible={showModal}
+                closeModal={() => setShowModal(false)}
+                style={{ backgroundColor: colors.primary_dark }}
+            >
+                <View style={styles.header}>
+                    <TextField
+                        style={{ flex: 1 }}
+                        value={search}
+                        onChangeText={setSearch}
+                        placeholder="Buscar ruta"
+                    />
+                    <TouchableOpacity
+                        style={styles.close_button}
+                        onPress={() => setShowModal(false)}
                     >
-                        <Button
-                            text="Marcar todos"
-                            onPress={markAllRoutes}
-                            style={{ backgroundColor: colors.accent_dark }}
+                        <MaterialCommunityIcons
+                            name="close-thick"
+                            size={34}
+                            color={colors.primary_dark}
                         />
-                        <Button
-                            text="Desmarcar todos"
-                            onPress={unmarkAllRoutes}
-                            style={{ backgroundColor: colors.accent_dark }}
-                        />
-                    </View>
-                </Modal>
-            </View>
+                    </TouchableOpacity>
+                </View>
+                <View style={styles.list_view}>
+                    <FlatList
+                        data={filteredRoutes}
+                        renderItem={_renderItem}
+                        style={{ maxHeight: windowHeight * 0.74 }}
+                    />
+                </View>
+                <View
+                    style={{
+                        justifyContent: 'center',
+                        flexDirection: 'row',
+                    }}
+                >
+                    <Button
+                        text="Marcar todos"
+                        onPress={markAllRoutes}
+                        style={{ backgroundColor: colors.accent_dark }}
+                    />
+                    <Button
+                        text="Desmarcar todos"
+                        onPress={unmarkAllRoutes}
+                        style={{ backgroundColor: colors.accent_dark }}
+                    />
+                </View>
+            </Modal>
         </SafeAreaProvider>
     )
 }

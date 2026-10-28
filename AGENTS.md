@@ -1,17 +1,18 @@
 # AGENTS.md
 
 ## Stack
-- Expo SDK `~54.0.31`, React Native `0.81.5`, React `19.1.0`, React Navigation not present
+- Expo SDK `~58.1`, React Native `0.88.0`, React `19.3.0`, TypeScript en todo el código (`.tsx`/`.ts`)
 - Entry: `index.js` registers `App` via `registerRootComponent` (Expo root)
-- Main UI: `App.js` (single-screen map app)
-- Native maps: `react-native-maps` (MapView, Polyline, Circle, MapMarker)
+- Main UI: `App.tsx` (map app con bottom navigation: tabs Mapa/Rutas)
+- Native maps: `react-native-maps@1.29.11` (MapView, Polyline, Circle, MapMarker); parcheado con `pnpm patch` para exponer `./app.plugin.js` en `exports` y usar los types de `dist/` (ver `patches/`)
 - Location: `expo-location` with foreground permission; watches position continuously
 
 ## Scripts (package.json)
-- `yarn start` / `npm start` → `expo start` (dev server)
-- `yarn android` → `expo run:android`
-- `yarn ios` → `expo run:ios`  
-- `yarn web` → `expo start --web`
+- `pnpm start` → `expo start` (dev server)
+- `pnpm android` → `expo run:android`
+- `pnpm ios` → `expo run:ios`
+- `pnpm web` → `expo start --web`
+- Package manager: pnpm (`.npmrc` con `node-linker=hoisted`, requerido por Expo/RN con pnpm)
 
 ## Data & Architecture
 - Routes loaded from `src/utils/json/rutas.json` (GeoJSON FeatureCollection, ~4928 lines). All routes start `active: true`.

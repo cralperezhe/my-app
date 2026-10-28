@@ -1,0 +1,20 @@
+diff --git a/package.json b/package.json
+index d00dcec9e85c112489f8a33afc9ba998b83da149..98cbe3dd1680d58300d64c387a222503d4587a37 100644
+--- a/package.json
++++ b/package.json
+@@ -126,5 +126,15 @@
+   },
+   "engines": {
+     "node": ">= 20.19.4"
++  },
++  "exports": {
++    ".": {
++      "types": "./dist/src/index.d.ts",
++      "default": "./src/index.ts"
++    },
++    "./package.json": "./package.json",
++    "./app.plugin.js": "./app.plugin.js",
++    "./lib/*": "./lib/*",
++    "./*": "./*"
+   }
+ }

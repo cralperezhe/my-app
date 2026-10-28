@@ -2,6 +2,7 @@
   "name": "my-app",
   "version": "1.0.0",
   "main": "index.js",
+  "packageManager": "pnpm@12.15.0",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
@@ -10,17 +11,22 @@
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
-    "@types/react": "~19.1.10",
-    "expo": "~54.0.31",
-    "expo-checkbox": "~5.0.8",
-    "expo-glass-effect": "~0.1.10",
-    "expo-location": "~19.0.8",
-    "expo-status-bar": "~3.0.9",
-    "react": "19.1.0",
-    "react-native": "0.81.5",
-    "react-native-maps": "1.20.1",
-    "react-native-safe-area-context": "~5.6.0",
-    "typescript": "~5.9.2"
+    "@types/react": "~19.3.0",
+    "expo": "~58.0.20",
+    "expo-checkbox": "~58.0.2",
+    "expo-glass-effect": "~58.0.5",
+    "expo-location": "~58.0.19",
+    "expo-status-bar": "~58.0.4",
+    "react": "19.3.0",
+    "react-native": "0.88.0",
+    "react-native-bottom-tabs": "^1.5.0",
+    "react-native-maps": "1.29.11",
+    "react-native-safe-area-context": "~5.10.1",
+    "react-native-vector-icons": "^10.3.0",
+    "typescript": "~6.0.3"
   },
-  "private": true
+  "private": true,
+  "devDependencies": {
+    "@types/react-native-vector-icons": "^6.4.18"
+  }
 }
