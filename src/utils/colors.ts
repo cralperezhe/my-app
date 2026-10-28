@@ -1,4 +1,4 @@
-export default {
+const colors = {
     primary: '#C7B8FF',
     primary_light: '#E6E0FF',
     primary_dark: '#9E8CFF',
@@ -6,4 +6,9 @@ export default {
     accent: '#B8EBD0',
     accent_light: '#E6F7EF',
     accent_dark: '#8FD6B5',
-}
+} as const
+
+type Colors = typeof colors
+export type ColorKey = keyof Colors
+
+export default colors as Record<ColorKey, string>

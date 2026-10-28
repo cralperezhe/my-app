@@ -20,22 +20,35 @@ import * as Location from 'expo-location'
 import Checkbox from './src/components/Checkbox'
 import colors from './src/utils/colors'
 import TextField from './src/components/TextField'
+import WelcomeScreen from './src/components/WelcomeScreen'
+import BottomNavigation, { TabKey, TabItem } from './src/components/BottomNavigation'
+import type { Route, MapRegion } from './src/utils/types'
 
 const { height: windowHeight } = Dimensions.get('window')
 
+const TABS: TabItem[] = [
+    { key: 'mapa', label: 'Mapa', icon: 'map-outline' },
+    { key: 'rutas', label: 'Rutas', icon: 'google-maps' },
+]
+
 export default function App() {
-    const [location, setLocation] = useState(null)
+    const [location, setLocation] = useState<MapRegion | null>(null)
     const [showModal, setShowModal] = useState(false)
     const [search, setSearch] = useState('')
     const [heading, setHeading] = useState(0)
-    const [accuracy, setAccuracy] = useState(null)
+    const [accuracy, setAccuracy] = useState<number | null>(null)
+    const [welcomeDone, setWelcomeDone] = useState(false)
+    const [activeTab, setActiveTab] = useState<TabKey>('mapa')
 
-    const [activeRoutes, setActiveRoutes] = useState(geoJsonToPolyline(routes))
+    const [activeRoutes, setActiveRoutes] = useState<Route[]>(
+        geoJsonToPolyline(routes)
+    )
 
-    const mapRef = useRef(null)
-    const locationSuscription = useRef(null)
+    const mapRef = useRef<MapView | null>(null)
+    const locationSuscription = useRef<Location.LocationSubscription | null>(null)
 
     useEffect(() => {
+        if (!welcomeDone) return
         getActualLocation()
         return () => {
             if (locationSuscription.current) {
@@ -43,7 +56,7 @@ export default function App() {
                 locationSuscription.current = null
             }
         }
-    }, [])
+    }, [welcomeDone])
 
     const normalizeText = (text = '') =>
         text
@@ -66,7 +79,6 @@ export default function App() {
         let { status } = await Location.requestForegroundPermissionsAsync()
         if (status !== 'granted') {
             Alert.alert('', 'No hay permisos de ubicación')
-
             return
         }
         if (locationSuscription.current) {
@@ -80,14 +92,12 @@ export default function App() {
                 distanceInterval: 5,
             },
             (location) => {
-                const region = {
+                const region: MapRegion = {
                     latitude: location.coords.latitude,
                     longitude: location.coords.longitude,
                     latitudeDelta: 0.0025,
                     longitudeDelta: 0.0025,
                 }
-                console.log(region)
-
                 setLocation(region)
                 setHeading(location.coords.heading ?? 0)
                 setAccuracy(location.coords.accuracy ?? null)
@@ -97,7 +107,7 @@ export default function App() {
         )
     }
 
-    const toggleRoute = (routeId) => {
+    const toggleRoute = (routeId: number) => {
         setActiveRoutes((prev) =>
             prev.map((route) =>
                 route.id === routeId
@@ -119,7 +129,7 @@ export default function App() {
         )
     }
 
-    const _renderItem = ({ item }) => {
+    const _renderItem = ({ item }: { item: Route }) => {
         return (
             <View style={{ marginVertical: 5 }}>
                 <Checkbox
@@ -127,8 +137,17 @@ export default function App() {
                     text={item.name ?? `Ruta ${item.id}`}
                     value={item.active}
                     onValueChange={() => toggleRoute(item.id)}
+                    color={item.color}
                 />
             </View>
+        )
+    }
+
+    if (!welcomeDone) {
+        return (
+            <SafeAreaProvider>
+                <WelcomeScreen onStart={() => setWelcomeDone(true)} />
+            </SafeAreaProvider>
         )
     }
 
@@ -145,65 +164,82 @@ export default function App() {
     return (
         <SafeAreaProvider>
             <View style={styles.container}>
-                <MapView
-                    style={styles.map}
-                    initialRegion={location}
-                    ref={mapRef}
-                >
-                    {accuracy && (
-                        <Circle
-                            center={location}
-                            radius={accuracy}
-                            strokeWidth={1}
-                            strokeColor="rgba(0,122,255,0.3)"
-                            fillColor="rgba(0,122,255,0.15)"
-                        />
-                    )}
-                    <MapMarker
-                        coordinate={location}
-                        anchor={{ x: 0.5, y: 0.5 }}
-                        rotation={heading}
-                        flat
-                    >
-                        <View style={styles.iosLocationOuter}>
-                            <View style={styles.iosLocationInner} />
-                        </View>
-                    </MapMarker>
-                    {activeRoutes.map(
-                        (ruta) =>
-                            ruta.active && (
-                                <Polyline
-                                    key={ruta.id}
-                                    coordinates={ruta.coordinates}
-                                    strokeWidth={4}
-                                    strokeColor={ruta.color}
+                {activeTab === 'mapa' && (
+                    <>
+                        <MapView
+                            style={styles.map}
+                            initialRegion={location}
+                            ref={mapRef}
+                        >
+                            {accuracy && (
+                                <Circle
+                                    center={location}
+                                    radius={accuracy}
+                                    strokeWidth={1}
+                                    strokeColor="rgba(0,122,255,0.3)"
+                                    fillColor="rgba(0,122,255,0.15)"
                                 />
-                            )
-                    )}
-                </MapView>
-                <TouchableOpacity
-                    style={styles.floating_button}
-                    onPress={() => setShowModal(true)}
-                >
-                    <MaterialCommunityIcons
-                        name="filter-cog"
-                        size={60}
-                        color={colors.primary}
-                    />
-                </TouchableOpacity>
+                            )}
+                            <MapMarker
+                                coordinate={location}
+                                anchor={{ x: 0.5, y: 0.5 }}
+                                rotation={heading}
+                                flat
+                            >
+                                <View style={styles.iosLocationOuter}>
+                                    <View style={styles.iosLocationInner} />
+                                </View>
+                            </MapMarker>
+                            {activeRoutes.map(
+                                (ruta) =>
+                                    ruta.active && (
+                                        <Polyline
+                                            key={ruta.id}
+                                            coordinates={ruta.coordinates}
+                                            strokeWidth={4}
+                                            strokeColor={ruta.color}
+                                        />
+                                    )
+                            )}
+                        </MapView>
+                        <TouchableOpacity
+                            style={styles.floating_button}
+                            onPress={() => setShowModal(true)}
+                        >
+                            <MaterialCommunityIcons
+                                name="filter-cog"
+                                size={60}
+                                color={colors.primary}
+                            />
+                        </TouchableOpacity>
+                    </>
+                )}
+                {activeTab === 'rutas' && (
+                    <View style={styles.routes_screen}>
+                        <Text style={styles.routes_title}>Rutas</Text>
+                        <FlatList
+                            data={filteredRoutes}
+                            renderItem={_renderItem}
+                            style={{ maxHeight: windowHeight * 0.8 }}
+                            ListEmptyComponent={
+                                <Text style={styles.routes_empty}>
+                                    No hay rutas que coincidan
+                                </Text>
+                            }
+                        />
+                    </View>
+                )}
+                <BottomNavigation
+                    tabs={TABS}
+                    activeTab={activeTab}
+                    onChangeTab={setActiveTab}
+                />
                 <Modal
                     visible={showModal}
                     closeModal={() => setShowModal(false)}
                     style={{ backgroundColor: colors.primary_dark }}
                 >
-                    <View
-                        style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            marginHorizontal: 7,
-                            justifyContent: 'center',
-                        }}
-                    >
+                    <View style={styles.header}>
                         <TextField
                             style={{ flex: 1 }}
                             value={search}
@@ -211,12 +247,7 @@ export default function App() {
                             placeholder="Buscar ruta"
                         />
                         <TouchableOpacity
-                            style={{
-                                padding: 10,
-                                marginVertical: 10,
-                                borderRadius: 100,
-                                backgroundColor: colors.primary_light,
-                            }}
+                            style={styles.close_button}
                             onPress={() => setShowModal(false)}
                         >
                             <MaterialCommunityIcons
@@ -263,13 +294,19 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginHorizontal: 7,
+        justifyContent: 'center',
+    },
     map: {
         width: '100%',
         height: '100%',
     },
     floating_button: {
         position: 'absolute',
-        bottom: 15,
+        bottom: 100,
         right: 15,
         padding: 10,
         margin: 10,
@@ -278,6 +315,23 @@ const styles = StyleSheet.create({
     },
     list_view: {
         marginHorizontal: 20,
+    },
+    routes_screen: {
+        flex: 1,
+        width: '100%',
+        paddingHorizontal: 20,
+        paddingTop: 20,
+    },
+    routes_title: {
+        fontSize: 24,
+        fontWeight: '700',
+        marginBottom: 10,
+        color: colors.primary_dark,
+    },
+    routes_empty: {
+        textAlign: 'center',
+        marginTop: 30,
+        color: colors.primary_dark,
     },
     iosLocationOuter: {
         width: 36,
@@ -294,5 +348,11 @@ const styles = StyleSheet.create({
         backgroundColor: '#007AFF',
         borderWidth: 2,
         borderColor: 'white',
+    },
+    close_button: {
+        padding: 10,
+        marginVertical: 10,
+        borderRadius: 100,
+        backgroundColor: colors.primary_light,
     },
 })

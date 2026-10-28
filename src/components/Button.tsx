@@ -3,7 +3,13 @@ import colors from '../utils/colors'
 
 const { width: windowWidth } = Dimensions.get('window')
 
-export default function Button({ text = '', style, onPress }) {
+interface ButtonProps {
+    text?: string
+    style?: object
+    onPress?: () => void
+}
+
+export default function Button({ text = '', style, onPress }: ButtonProps) {
     return (
         <TouchableOpacity style={[styles.button, style]} onPress={onPress}>
             <Text style={styles.text}>{text}</Text>
